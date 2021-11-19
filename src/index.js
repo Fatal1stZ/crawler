@@ -12,7 +12,7 @@ class Crawler {
     this.queuedUrls = [];
     this.visitedUrls = new Set([]);
     this.foundUrls = [];
-    this.maxUrlsToCrawl = 5;
+    this.maxCrowls = options.maxCrowls || 100;
   }
 
   async crawl() {
@@ -21,7 +21,7 @@ class Crawler {
     if (urlToVisit && !this.visitedUrls.has(urlToVisit)) {
       await this.visitUrl(urlToVisit);
     }
-    if (this.queuedUrls.length === 0 || this.visitedUrls.size === this.maxUrlsToCrawl) {
+    if (this.queuedUrls.length === 0 || this.visitedUrls.size === this.maxCrowls) {
       this.finish();
       return;
     }
