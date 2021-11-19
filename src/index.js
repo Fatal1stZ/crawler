@@ -4,6 +4,14 @@ import parseUrl from 'url-parse';
 
 class Crawler {
 
+  /**
+   *
+   * @param options
+   * @param options.url {string} Url to crawl
+   * @param options.term {string} Term to search
+   * @param options.maxCrawls {number} Max attempts to crawl (debug)
+   *
+   */
   constructor(options = {}) {
     const parsedUrl = parseUrl(options.url);
     this.url = options.url;
@@ -12,16 +20,17 @@ class Crawler {
     this.queuedUrls = [];
     this.visitedUrls = new Set([]);
     this.foundUrls = [];
-    this.maxCrowls = options.maxCrowls || 100;
+    this.MAX_CRAWLS = options.maxCrawls || 100;
+    this.DEEP_LINK_LEVEL = 2
   }
 
   async crawl() {
-    // console.log('crawl...', this.queuedUrls)
     const urlToVisit = this.queuedUrls.shift();
     if (urlToVisit && !this.visitedUrls.has(urlToVisit)) {
+      /* for faster probably better to try run crawls asynchronously via setTimeout, still thought we have single-thread Node.js... */
       await this.visitUrl(urlToVisit);
     }
-    if (this.queuedUrls.length === 0 || this.visitedUrls.size === this.maxCrowls) {
+    if (this.queuedUrls.length === 0 || this.visitedUrls.size === this.MAX_CRAWLS) {
       this.finish();
       return;
     }
@@ -34,14 +43,19 @@ class Crawler {
     const clearTerm = new RegExp(this.term.toLowerCase(), 'g');
     const searchIndex = clearText.search(clearTerm);
     if (searchIndex >= -1) {
-      return `...${originalText.substr(searchIndex-5, 10)}${this.term}${originalText.substr(searchIndex+this.term.length, 10)}...`
+      return `...${originalText.substr(searchIndex - 10, 10)}${this.term}${originalText.substr(searchIndex + this.term.length, 10)}...`;
     }
   }
 
   parseLinks($) {
-    const links = $('a[href^="/"]');
-    for (const link of links) {
-      this.queuedUrls.push(`${this.baseUrl}${$(link).attr('href')}`);
+    /* here may be absolute links... */
+    const $links = $('a[href^="/"]');
+    for (const $link of $links) {
+      const link = $($link).attr('href').replace(/\/$/, '') || '';
+      const levelsDeep = link.split('/') || []
+      if (levelsDeep.length - 1 <= this.DEEP_LINK_LEVEL){
+        this.queuedUrls.push(`${this.baseUrl}${link}`);
+      }
     }
   }
 
@@ -54,27 +68,21 @@ class Crawler {
     const $ = load(html);
     this.parseLinks($);
     const highlight = this.searchTerm($);
-    if (highlight)
-    {
-      console.log(`Found: ${highlight}`)
+    if (highlight) {
       this.foundUrls.push({
         highlight,
         url
-      })
+      });
     }
-  }
-
-  isVisitedUrl(url) {
-    return this.visitedUrls.includes(url);
   }
 
   start() {
     this.queuedUrls.push(this.url);
-    this.crawl();
+    this.crawl().then();
   }
 
   finish() {
-    this.log(`Crawled ${this.visitedUrls.length} urls. Found ${this.foundUrls.length} pages with the term '${this.term}'.`);
+    this.log(`Crawled ${this.visitedUrls.size} urls. Found ${this.foundUrls.length} pages with the term '${this.term}'.`);
     this.foundUrls.forEach(foundUrl => {
       this.log(`Url: ${foundUrl.url}, highlight: ${foundUrl.highlight}`);
     });
@@ -86,5 +94,5 @@ class Crawler {
 }
 
 
-const crawler = new Crawler({url: 'https://apple.com', term: 'iPhone'});
+const crawler = new Crawler({url: 'https://apple.com', term: 'Durability'});
 crawler.start();
